@@ -53,5 +53,6 @@ def predict():
     
     return jsonify({'message': 'Prédiction effectuée avec succès', 'output_image': output_image_path})
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5050)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
