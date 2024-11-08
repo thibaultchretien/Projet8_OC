@@ -6,25 +6,32 @@ from PIL import Image
 import numpy as np
 
 # Charger le modèle
-model = load_model('model_unet.h5')
+try:
+    print("Chargement du modèle...")
+    model = load_model('model_unet.h5')
+    print("Modèle chargé.")
+except Exception as e:
+    print(f"Erreur lors du chargement du modèle: {str(e)}")
 
 app = Flask(__name__)
 
 # Fonction pour prédire le mask à partir de l'image
 def predict_mask(image_path):
-    # Charger l'image
-    image = Image.open(image_path)
-    image = image.resize((256, 256))  # Redimensionner l'image à la taille attendue par le modèle
-    image = np.array(image)
-    image = np.expand_dims(image, axis=0)  # Ajouter la dimension batch
-    image = image / 255.0  # Normaliser les pixels
+    try:
+        # Charger l'image
+        image = Image.open(image_path)
+        image = image.resize((256, 256))  # Redimensionner l'image
+        image = np.array(image)
+        image = np.expand_dims(image, axis=0)  # Ajouter la dimension batch
+        image = image / 255.0  # Normalisation
 
-    # Prédiction
-    mask = model.predict(image)
-    mask = np.argmax(mask, axis=-1)  # Prendre la classe avec la plus haute probabilité pour chaque pixel
-    mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
-
-    return mask
+        # Prédiction
+        mask = model.predict(image)
+        mask = np.argmax(mask, axis=-1)  # Prendre la classe la plus probable
+        mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
+        return mask
+    except Exception as e:
+        return None, str(e)
 
 # Route principale pour la prédiction
 @app.route('/predict', methods=['POST'])
@@ -38,18 +45,22 @@ def predict():
 
     # Sauvegarder l'image reçue
     file_path = os.path.join('uploads', file.filename)
-    file.save(file_path)
+    try:
+        file.save(file_path)
+    except Exception as e:
+        return jsonify({'error': f"Erreur lors de la sauvegarde de l'image: {str(e)}"}), 500
 
     # Prédire le mask
-    mask = predict_mask(file_path)
+    mask, error = predict_mask(file_path)
+    if mask is None:
+        return jsonify({'error': f"Erreur lors de la prédiction: {error}"}), 500
 
-    # Sauvegarder le mask prédit sous forme d'image
-    mask_image = Image.fromarray(mask.astype(np.uint8))  # Convertir le mask en image
+    # Sauvegarder le mask prédit
+    mask_image = Image.fromarray(mask.astype(np.uint8))
     mask_image_path = 'predicted_mask.png'
     mask_image.save(mask_image_path)
 
     return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # Utiliser le port dynamique de Heroku ou 5000 par défaut
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(debug=True, port=int(os.environ.get('PORT', 5000)))
