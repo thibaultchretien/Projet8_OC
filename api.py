@@ -8,8 +8,11 @@ import numpy as np
 # Charger le modèle
 model = load_model('model_unet.h5')
 
-# Créer l'application Flask
 app = Flask(__name__)
+
+# Créer le répertoire 'uploads' s'il n'existe pas
+if not os.path.exists('uploads'):
+    os.makedirs('uploads')
 
 # Fonction pour prédire le mask à partir de l'image
 def predict_mask(image_path):
@@ -52,5 +55,4 @@ def predict():
     return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
 
 if __name__ == '__main__':
-    # Utiliser le port dynamique pour Heroku et forcer Flask à écouter sur toutes les interfaces réseau
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=True)
