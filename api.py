@@ -1,64 +1,41 @@
-import numpy as np
 from flask import Flask, request, jsonify
-import tensorflow as tf
-from tensorflow.keras.models import load_model
+import numpy as np
 from PIL import Image
+from tensorflow.keras.models import load_model
 import io
 import base64
 
-# Charger le modèle
-model = load_model('model_segmentation.h5')  # Assurez-vous que le modèle est dans le même répertoire ou ajustez le chemin
-
 app = Flask(__name__)
 
-# Fonction pour prédire le masque à partir de l'image
-def predict_mask(image_bytes):
-    # Convertir les bytes en image
-    image = Image.open(io.BytesIO(image_bytes))
-    image = image.resize((256, 256))  # Redimensionner l'image
-    image = np.array(image)
-    image = np.expand_dims(image, axis=0)  # Ajouter la dimension batch
-    image = image / 255.0  # Normalisation
+model = load_model('model_segmentation.h5')
 
-    # Prédiction
-    mask = model.predict(image)
-    
-    # Si la sortie est une carte de probabilités, on applique np.argmax pour obtenir le masque
-    mask = np.argmax(mask, axis=-1)  # Trouver la classe la plus probable pour chaque pixel
-    mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
-
-    return mask
-
-# Fonction pour convertir l'image en base64
-def image_to_base64(image):
-    buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    return img_str
-
-# Route principale pour la prédiction
 @app.route('/predict', methods=['POST'])
 def predict():
     if 'image' not in request.files:
-        return jsonify({'error': 'No image file in the request'}), 400
+        return jsonify({"error": "No image provided"}), 400
 
-    file = request.files['image']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    image_file = request.files['image']
+    image = Image.open(image_file)
+    image = image.resize((256, 256))  # Redimensionner à la taille requise
+    image_array = np.array(image) / 255.0  # Normalisation
 
-    # Lire l'image directement en mémoire
-    image_bytes = file.read()
+    # Ajouter la dimension batch pour la prédiction
+    image_array = np.expand_dims(image_array, axis=0)
 
     # Prédire le masque
-    mask = predict_mask(image_bytes)
+    mask = model.predict(image_array)
 
-    # Convertir le mask en image
+    # Appliquer np.argmax si nécessaire (si multi-classe)
+    mask = np.argmax(mask, axis=-1)
+    mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
+
+    # Convertir le masque en image et l'encoder en base64
     mask_image = Image.fromarray(mask.astype(np.uint8))
+    buffered = io.BytesIO()
+    mask_image.save(buffered, format="PNG")
+    mask_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    # Convertir le mask en base64 pour l'envoi au client
-    mask_image_base64 = image_to_base64(mask_image)
-
-    return jsonify({'message': 'Prediction complete', 'mask_image_base64': mask_image_base64})
+    return jsonify({"mask_image_base64": mask_base64})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=True)
