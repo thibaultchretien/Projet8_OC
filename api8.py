@@ -10,7 +10,7 @@ import io
 app = Flask(__name__)
 
 # Charger le modèle de segmentation
-model = load_model('segmentation_model.h5')
+model = load_model('model_unet.h5')
 
 # Route home pour vérifier que l'API fonctionne
 @app.route('/')
