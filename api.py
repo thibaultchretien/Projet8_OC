@@ -8,6 +8,9 @@ import numpy as np
 # Charger le modèle
 model = load_model('model_unet.h5')
 
+# Compiler le modèle (si ce n'est pas déjà fait lors du chargement)
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
 app = Flask(__name__)
 
 # Fonction pour prédire le mask à partir de l'image
@@ -38,17 +41,22 @@ def predict():
 
     # Sauvegarder l'image reçue
     file_path = os.path.join('uploads', file.filename)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)  # Créer le dossier 'uploads' s'il n'existe pas
     file.save(file_path)
 
     # Prédire le mask
     mask = predict_mask(file_path)
 
+    # Convertir le mask en image
+    mask = mask.astype(np.uint8)  # Convertir le masque en uint8 pour le rendre compatible avec PIL
+    mask_image = Image.fromarray(mask)
+
     # Sauvegarder le mask prédit sous forme d'image
-    mask_image = Image.fromarray(mask.astype(np.uint8))  # Convertir le mask en image
     mask_image_path = 'predicted_mask.png'
     mask_image.save(mask_image_path)
 
     return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
 
+# Démarrer l'application sur le bon port pour Heroku
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))  # Utiliser le port fourni par Heroku
