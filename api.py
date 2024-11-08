@@ -4,8 +4,6 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from PIL import Image
 import numpy as np
-import base64
-from io import BytesIO
 
 # Charger le modèle
 try:
@@ -16,6 +14,10 @@ except Exception as e:
     print(f"Erreur lors du chargement du modèle: {str(e)}")
 
 app = Flask(__name__)
+
+# Créer le répertoire uploads s'il n'existe pas
+if not os.path.exists('uploads'):
+    os.makedirs('uploads')
 
 # Fonction pour prédire le mask à partir de l'image
 def predict_mask(image_path):
@@ -34,13 +36,6 @@ def predict_mask(image_path):
         return mask
     except Exception as e:
         return None, str(e)
-
-# Convertir l'image du mask en base64
-def convert_image_to_base64(image):
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return img_str
 
 # Route principale pour la prédiction
 @app.route('/predict', methods=['POST'])
@@ -64,11 +59,12 @@ def predict():
     if mask is None:
         return jsonify({'error': f"Erreur lors de la prédiction: {error}"}), 500
 
-    # Convertir le mask en image et puis en base64
+    # Sauvegarder le mask prédit
     mask_image = Image.fromarray(mask.astype(np.uint8))
-    mask_image_base64 = convert_image_to_base64(mask_image)
+    mask_image_path = 'predicted_mask.png'
+    mask_image.save(mask_image_path)
 
-    return jsonify({'message': 'Prediction complete', 'mask_image_base64': mask_image_base64})
+    return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
 
 if __name__ == '__main__':
     app.run(debug=True, port=int(os.environ.get('PORT', 5000)))
