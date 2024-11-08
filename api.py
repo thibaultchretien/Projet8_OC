@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from flask import Flask, request, jsonify
 import tensorflow as tf
@@ -23,8 +22,11 @@ def predict_mask(image_bytes):
 
     # Prédiction
     mask = model.predict(image)
-    mask = np.argmax(mask, axis=-1)  # Prendre la classe la plus probable
+    
+    # Si la sortie est une carte de probabilités, on applique np.argmax pour obtenir le masque
+    mask = np.argmax(mask, axis=-1)  # Trouver la classe la plus probable pour chaque pixel
     mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
+
     return mask
 
 # Fonction pour convertir l'image en base64
