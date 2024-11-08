@@ -15,10 +15,6 @@ except Exception as e:
 
 app = Flask(__name__)
 
-# Créer le répertoire uploads s'il n'existe pas
-if not os.path.exists('uploads'):
-    os.makedirs('uploads')
-
 # Fonction pour prédire le mask à partir de l'image
 def predict_mask(image_path):
     try:
@@ -47,8 +43,8 @@ def predict():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # Sauvegarder l'image reçue
-    file_path = os.path.join('uploads', file.filename)
+    # Sauvegarder l'image reçue dans le répertoire courant
+    file_path = file.filename  # Sauvegarder directement avec le nom du fichier dans le répertoire courant
     try:
         file.save(file_path)
     except Exception as e:
@@ -59,9 +55,9 @@ def predict():
     if mask is None:
         return jsonify({'error': f"Erreur lors de la prédiction: {error}"}), 500
 
-    # Sauvegarder le mask prédit
+    # Sauvegarder le mask prédit dans le répertoire courant
     mask_image = Image.fromarray(mask.astype(np.uint8))
-    mask_image_path = 'predicted_mask.png'
+    mask_image_path = 'predicted_mask.png'  # Sauvegarder le masque avec un nom fixe dans le répertoire courant
     mask_image.save(mask_image_path)
 
     return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
