@@ -8,7 +8,7 @@ import io
 import base64
 
 # Charger le modèle
-model = load_model('model_unet.h5')  # Assurez-vous que le modèle est dans le même répertoire ou ajustez le chemin
+model = load_model('model_segmentation.h5')  # Assurez-vous que le modèle est dans le même répertoire ou ajustez le chemin
 
 app = Flask(__name__)
 
