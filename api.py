@@ -5,6 +5,7 @@ from tensorflow.keras.models import load_model
 from PIL import Image
 import numpy as np
 import io
+import base64
 
 # Charger le modèle
 try:
@@ -34,6 +35,13 @@ def predict_mask(image_bytes):
     except Exception as e:
         return None, str(e)
 
+# Fonction pour convertir l'image en base64
+def image_to_base64(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return img_str
+
 # Route principale pour la prédiction
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -53,12 +61,11 @@ def predict():
         if mask is None:
             return jsonify({'error': f"Erreur lors de la prédiction: {error}"}), 500
 
-        # Sauvegarder le masque prédit dans un format de retour pour l'affichage (sans fichier)
+        # Convertir le mask en image et en base64
         mask_image = Image.fromarray(mask.astype(np.uint8))
-        mask_image_path = 'predicted_mask.png'  # Masque retourné dans un format d'image
-        mask_image.save(mask_image_path)
+        mask_image_base64 = image_to_base64(mask_image)
 
-        return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
+        return jsonify({'message': 'Prediction complete', 'mask_image_base64': mask_image_base64})
 
     except Exception as e:
         return jsonify({'error': f"Erreur: {str(e)}"}), 500
