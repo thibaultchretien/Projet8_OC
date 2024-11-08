@@ -10,10 +10,6 @@ model = load_model('model_unet.h5')
 
 app = Flask(__name__)
 
-# Créer le répertoire 'uploads' s'il n'existe pas
-if not os.path.exists('uploads'):
-    os.makedirs('uploads')
-
 # Fonction pour prédire le mask à partir de l'image
 def predict_mask(image_path):
     # Charger l'image
@@ -55,4 +51,5 @@ def predict():
     return jsonify({'message': 'Prediction complete', 'mask_image': mask_image_path})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))  # Utiliser le port dynamique de Heroku ou 5000 par défaut
+    app.run(host='0.0.0.0', port=port, debug=True)
