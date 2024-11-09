@@ -7,7 +7,7 @@ from PIL import Image
 
 # Initialize Flask app and load model
 app = Flask(__name__)
-model = load_model("model_unet.h5")
+model = load_model("model_segmentation.h5")
 
 def preprocess_image(image, target_size=(256, 256)):
     """Resize and normalize the input image for the model."""
