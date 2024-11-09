@@ -1,71 +1,39 @@
 import numpy as np
 from flask import Flask, request, jsonify
-import tensorflow as tf
 from tensorflow.keras.models import load_model
 from PIL import Image
 import io
 import base64
 import os
 
-# Charger le modèle
-model = load_model('model_segmentation.h5')  # Assurez-vous que le modèle est dans le même répertoire ou ajustez le chemin
+# Charger le modèle de segmentation
+model = load_model('model_segmentation.h5')
 
 app = Flask(__name__)
 
 # Fonction pour prédire le masque à partir de l'image
 def predict_mask(image_bytes):
-    # Convertir les bytes en image
-    image = Image.open(io.BytesIO(image_bytes))
-    image = image.resize((256, 256))  # Redimensionner l'image
-    image = np.array(image)
-    image = np.expand_dims(image, axis=0)  # Ajouter la dimension batch
-    image = image / 255.0  # Normalisation
-
-    # Prédiction
-    mask = model.predict(image)
-
-    # Affichage des informations pour débogage
-    print("Forme du masque:", mask.shape)
-    print("Valeur minimale du masque:", np.min(mask))
-    print("Valeur maximale du masque:", np.max(mask))
-
-    # Si le modèle effectue une segmentation multi-classe, utilisez np.argmax
-    mask = np.argmax(mask, axis=-1)  # Trouver la classe la plus probable pour chaque pixel
-    mask = np.squeeze(mask, axis=0)  # Enlever la dimension batch
-
-    # Si le modèle effectue une segmentation binaire, vous pouvez appliquer un seuil
-    # mask = (mask > 0.5).astype(np.uint8)  # Seuil pour la segmentation binaire, si applicable
-
-    return mask
+    image = Image.open(io.BytesIO(image_bytes)).resize((256, 256))
+    image_array = np.expand_dims(np.array(image) / 255.0, axis=0)  # Préparation de l'image
+    mask = model.predict(image_array)  # Prédiction du masque
+    mask = np.argmax(mask, axis=-1).squeeze()  # Classes prédictives et suppression de la dimension batch
+    return Image.fromarray(mask.astype(np.uint8))  # Retourne le masque en tant qu'image
 
 # Fonction pour convertir l'image en base64
 def image_to_base64(image):
-    buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    return img_str
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 # Route principale pour la prédiction
 @app.route('/predict', methods=['POST'])
 def predict():
-    if 'image' not in request.files:
-        return jsonify({'error': 'No image file in the request'}), 400
+    file = request.files.get('image')
+    if not file or file.filename == '':
+        return jsonify({'error': 'No image file provided'}), 400
 
-    file = request.files['image']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
-    # Lire l'image directement en mémoire
-    image_bytes = file.read()
-
-    # Prédire le masque
-    mask = predict_mask(image_bytes)
-
-    # Convertir le mask en image
-    mask_image = Image.fromarray(mask.astype(np.uint8))
-
-    # Convertir le mask en base64 pour l'envoi au client
-    mask_image_base64 = image_to_base64(mask_image)
+    mask_image = predict_mask(file.read())  # Prédire le masque
+    mask_image_base64 = image_to_base64(mask_image)  # Encoder en base64
 
     return jsonify({'message': 'Prediction complete', 'mask_image_base64': mask_image_base64})
 
