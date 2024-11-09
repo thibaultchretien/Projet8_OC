@@ -7,7 +7,7 @@ import base64
 import os
 
 # Charger le modèle de segmentation
-model = load_model('model_segmentation.h5')
+model = load_model('model_simple.h5')
 #model = load_model('model_unet.h5')
 
 app = Flask(__name__)
