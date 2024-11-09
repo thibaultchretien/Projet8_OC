@@ -1,42 +1,51 @@
+import io
+import base64
 import numpy as np
 from flask import Flask, request, jsonify
 from tensorflow.keras.models import load_model
 from PIL import Image
-import io
-import base64
-import os
 
-# Charger le modèle de segmentation
-model = load_model('model_segmentation.h5')
-#model = load_model('model_unet.h5')
-
+# Initialize Flask app and load model
 app = Flask(__name__)
+model = load_model("model_unet.h5")
 
-# Fonction pour prédire le masque à partir de l'image
-def predict_mask(image_bytes):
-    image = Image.open(io.BytesIO(image_bytes)).resize((256, 256))
-    image_array = np.expand_dims(np.array(image) / 255.0, axis=0)  # Préparation de l'image
-    mask = model.predict(image_array)  # Prédiction du masque
-    mask = np.argmax(mask, axis=-1).squeeze()  # Classes prédictives et suppression de la dimension batch
-    return Image.fromarray(mask.astype(np.uint8))  # Retourne le masque en tant qu'image
+def preprocess_image(image, target_size=(256, 256)):
+    """Resize and normalize the input image for the model."""
+    image = image.resize(target_size)
+    image_array = np.array(image) / 255.0  # Normalize
+    return np.expand_dims(image_array, axis=0)  # Add batch dimension
 
-# Fonction pour convertir l'image en base64
-def image_to_base64(image):
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+def postprocess_mask(mask):
+    """Post-process the model output for visualization."""
+    mask = np.squeeze(mask)  # Remove batch dimension
+    mask = (mask > 0.5).astype(np.uint8) * 255  # Binarize and scale to 0-255
+    return mask
 
-# Route principale pour la prédiction
+@app.route('/')
+def home():
+    """Home route to confirm the API is running."""
+    return "Welcome to the Image Segmentation API! The API is up and running."
+
 @app.route('/predict', methods=['POST'])
 def predict():
-    file = request.files.get('image')
-    if not file or file.filename == '':
-        return jsonify({'error': 'No image file provided'}), 400
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image provided'}), 400
 
-    mask_image = predict_mask(file.read())  # Prédire le masque
-    mask_image_base64 = image_to_base64(mask_image)  # Encoder en base64
+    file = request.files['image']
+    image = Image.open(io.BytesIO(file.read())).convert("RGB")
+    input_data = preprocess_image(image)
 
-    return jsonify({'message': 'Prediction complete', 'mask_image_base64': mask_image_base64})
+    # Model prediction
+    prediction = model.predict(input_data)
+    mask = postprocess_mask(prediction[0])
 
-if __name__ == '__main__':
-    app.run(debug=True, port=int(os.environ.get('PORT', 5000)))
+    # Convert mask to base64 for response
+    mask_img = Image.fromarray(mask)
+    buffered = io.BytesIO()
+    mask_img.save(buffered, format="PNG")
+    mask_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    return jsonify({"predicted_mask": mask_base64})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
